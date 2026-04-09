@@ -1,0 +1,11 @@
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+COPY requirements/dbt.txt /tmp/requirements-dbt.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-dbt.txt
+
+WORKDIR /opt/project/dbt_project
+
+CMD ["sleep", "infinity"]

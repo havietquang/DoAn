@@ -1,0 +1,4 @@
+order_id,customer_id,order_status,order_purchase_timestamp,order_approved_at,order_delivered_carrier_date,order_delivered_customer_date,order_estimated_delivery_date
+o1,c1,delivered,2017-01-10 10:00:00,2017-01-10 10:30:00,2017-01-11 09:00:00,2017-01-15 15:00:00,2017-01-20 00:00:00
+o2,c2,delivered,2017-02-05 14:20:00,2017-02-05 14:45:00,2017-02-06 08:00:00,2017-02-12 12:00:00,2017-02-18 00:00:00
+o3,c3,shipped,2017-03-01 09:15:00,2017-03-01 09:40:00,2017-03-02 10:30:00,,2017-03-10 00:00:00

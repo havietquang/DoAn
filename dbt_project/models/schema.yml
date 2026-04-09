@@ -1,0 +1,64 @@
+version: 2
+
+sources:
+  - name: raw
+    database: "{{ env_var('POSTGRES_DB', 'olist_dw') }}"
+    schema: raw
+    tables:
+      - name: olist_customers_dataset
+      - name: olist_orders_dataset
+      - name: olist_order_items_dataset
+      - name: olist_products_dataset
+      - name: olist_sellers_dataset
+
+models:
+  - name: stg_customers
+    columns:
+      - name: customer_id
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_orders
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_customers
+    columns:
+      - name: customer_id
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_products
+    columns:
+      - name: product_id
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_sellers
+    columns:
+      - name: seller_id
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_date
+    columns:
+      - name: date_day
+        tests:
+          - not_null
+          - unique
+
+  - name: fact_orders
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+      - name: total_amount
+        tests:
+          - not_null
