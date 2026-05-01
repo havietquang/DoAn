@@ -39,7 +39,7 @@ def load_csv_to_postgres(engine, csv_path: Path) -> None:
         name=table_name,
         con=engine,
         schema="raw",
-        if_exists="replace",
+        if_exists="append",
         index=False,
         method="multi",
         chunksize=500,
