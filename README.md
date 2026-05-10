@@ -21,10 +21,15 @@ The solution contains five connected layers:
    - `analytics.dim_date`
 
 4. Workflow orchestration
-   Airflow runs the ETL pipeline in order:
-   - ingestion
-   - `dbt run`
-   - `dbt test`
+   Airflow runs a more production-style pipeline in order:
+   - preflight checks for source files and PostgreSQL connectivity
+   - raw ingestion into PostgreSQL
+   - raw-layer validation
+   - layered dbt build with Astronomer Cosmos: `staging` -> `silver` -> `marts`
+   - warehouse quality assurance with `dbt test`
+   - dbt docs generation
+
+   The dbt portion is rendered with `DbtTaskGroup`, so each dbt model appears as an individual Airflow task. This makes it easier to inspect success, failure, retries, and model-level lineage in the Airflow UI.
 
 5. AI Agent
    A FastAPI app receives a natural language question, translates it to SQL with either:
@@ -44,7 +49,11 @@ project_root/
 ├── docker-compose.yml
 ├── airflow/
 │   └── dags/
-│       └── etl_pipeline.py
+│       ├── etl_pipeline.py
+│       └── olist_pipeline/
+│           ├── constants.py
+│           ├── cosmos_helpers.py
+│           └── validations.py
 ├── ai_agent/
 │   ├── app.py
 │   ├── config.py
@@ -133,10 +142,12 @@ Trigger the DAG:
 olist_etl_pipeline
 ```
 
-The DAG runs:
-- `ingest_raw_csv_to_postgres`
-- `dbt_run_models`
-- `dbt_test_models`
+The DAG runs these core job groups:
+- `preflight_checks`
+- `raw_ingestion`
+- `dbt_build`
+- `quality_assurance`
+- `publish_artifacts`
 
 ### 4. Query the AI Agent
 

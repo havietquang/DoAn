@@ -1,113 +1,109 @@
 from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
-from airflow.sensors.external_task import ExternalTaskSensor
 from airflow.utils.task_group import TaskGroup
 
-
-default_args = {
-    "owner": "thesis-demo",
-    "depends_on_past": False,
-    "retries": 3,
-    "retry_delay": timedelta(minutes=5),
-    "execution_timeout": timedelta(hours=2),
-    "email_on_failure": False,
-    "email_on_retry": False,
-}
-
-
-def validate_data_quality():
-    """Validate data quality after ingestion"""
-    import psycopg2
-    from psycopg2.extras import RealDictCursor
-
-    conn = psycopg2.connect(
-        host="postgres",
-        database="olist_dw",
-        user="olist_user",
-        password="olist_pass"
-    )
-
-    try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Check if tables have data
-            tables = ['olist_orders_dataset', 'olist_customers_dataset', 'olist_products_dataset']
-            for table in tables:
-                cur.execute(f"SELECT COUNT(*) as count FROM raw.{table}")
-                result = cur.fetchone()
-                if result['count'] == 0:
-                    raise ValueError(f"Table raw.{table} is empty")
-
-            # Check for data consistency
-            cur.execute("""
-                SELECT COUNT(*) as orders_with_customers
-                FROM raw.olist_orders_dataset o
-                LEFT JOIN raw.olist_customers_dataset c ON o.customer_id = c.customer_id
-                WHERE c.customer_id IS NULL
-            """)
-            orphaned_orders = cur.fetchone()['orders_with_customers']
-            if orphaned_orders > 0:
-                raise ValueError(f"Found {orphaned_orders} orders without customers")
-
-            print(f"✓ Data quality validation passed")
-
-    finally:
-        conn.close()
+from olist_pipeline.constants import DEFAULT_ARGS, PROJECT_ROOT
+from olist_pipeline.cosmos_helpers import build_dbt_task_group
+from olist_pipeline.validations import (
+    check_postgres_connectivity,
+    validate_analytics_layer,
+    validate_raw_layer,
+    verify_source_files,
+)
 
 
 with DAG(
     dag_id="olist_etl_pipeline",
-    default_args=default_args,
-    description="Ingest Olist data, build dbt warehouse models, and run tests",
+    default_args=DEFAULT_ARGS,
+    description=(
+        "Enterprise-style Olist warehouse pipeline with helper modules, "
+        "layered ingestion checks, and Cosmos dbt task groups."
+    ),
     start_date=datetime(2024, 1, 1),
     schedule=None,
     catchup=False,
-    tags=["olist", "thesis", "dw"],
+    tags=["olist", "warehouse", "dbt", "airflow", "cosmos"],
     max_active_runs=1,
 ) as dag:
+    with TaskGroup(
+        "preflight_checks",
+        tooltip="Validate source files and database connectivity before ingestion",
+    ) as preflight_group:
+        check_source_files = PythonOperator(
+            task_id="check_source_files",
+            python_callable=verify_source_files,
+            execution_timeout=timedelta(minutes=3),
+        )
 
-    with TaskGroup("data_ingestion", tooltip="Load raw CSV data into PostgreSQL") as ingest_group:
-        ingest_data = BashOperator(
+        check_database_connection = PythonOperator(
+            task_id="check_database_connection",
+            python_callable=check_postgres_connectivity,
+            execution_timeout=timedelta(minutes=3),
+        )
+
+        check_source_files >> check_database_connection
+
+    with TaskGroup(
+        "raw_ingestion",
+        tooltip="Load raw CSV files into PostgreSQL and validate raw-layer quality",
+    ) as raw_ingestion_group:
+        ingest_raw_csv = BashOperator(
             task_id="ingest_raw_csv_to_postgres",
-            bash_command="cd /opt/project && python ingestion/load_data.py",
+            bash_command=f"cd {PROJECT_ROOT} && python ingestion/load_data.py",
             execution_timeout=timedelta(minutes=30),
         )
 
-        validate_quality = PythonOperator(
-            task_id="validate_data_quality",
-            python_callable=validate_data_quality,
-            execution_timeout=timedelta(minutes=5),
-        )
-
-        ingest_data >> validate_quality
-
-    with TaskGroup("dbt_transformations", tooltip="Run dbt models and tests") as dbt_group:
-        dbt_deps = BashOperator(
-            task_id="dbt_install_deps",
-            bash_command="cd /opt/project/dbt_project && dbt deps --profiles-dir .",
+        validate_raw_data = PythonOperator(
+            task_id="validate_raw_layer",
+            python_callable=validate_raw_layer,
             execution_timeout=timedelta(minutes=10),
         )
 
-        dbt_run = BashOperator(
-            task_id="dbt_run_models",
-            bash_command="cd /opt/project/dbt_project && dbt run --profiles-dir . --fail-fast",
-            execution_timeout=timedelta(minutes=30),
+        ingest_raw_csv >> validate_raw_data
+
+    with TaskGroup(
+        "dbt_transformations",
+        tooltip="Render each dbt model as a separate Airflow task using Astronomer Cosmos",
+    ) as dbt_group:
+        dbt_staging = build_dbt_task_group(
+            group_id="staging_models",
+            select=["path:models/staging"],
         )
 
-        dbt_test = BashOperator(
-            task_id="dbt_test_models",
-            bash_command="cd /opt/project/dbt_project && dbt test --profiles-dir . --fail-fast",
-            execution_timeout=timedelta(minutes=15),
+        dbt_silver = build_dbt_task_group(
+            group_id="silver_models",
+            select=["path:models/silver"],
         )
 
-        dbt_docs = BashOperator(
+        dbt_marts = build_dbt_task_group(
+            group_id="mart_models",
+            select=["path:models/marts"],
+        )
+
+        dbt_staging >> dbt_silver >> dbt_marts
+
+    with TaskGroup(
+        "quality_assurance",
+        tooltip="Validate final analytics outputs after Cosmos dbt execution",
+    ) as quality_group:
+        validate_analytics_outputs = PythonOperator(
+            task_id="validate_analytics_outputs",
+            python_callable=validate_analytics_layer,
+            execution_timeout=timedelta(minutes=10),
+        )
+
+    with TaskGroup(
+        "publish_artifacts",
+        tooltip="Generate dbt documentation artifacts for warehouse exploration",
+    ) as publish_group:
+        dbt_generate_docs = BashOperator(
             task_id="dbt_generate_docs",
             bash_command="cd /opt/project/dbt_project && dbt docs generate --profiles-dir .",
             execution_timeout=timedelta(minutes=10),
         )
 
-        dbt_deps >> dbt_run >> dbt_test >> dbt_docs
-
-    # Set dependencies
-    ingest_group >> dbt_group
+    preflight_group >> raw_ingestion_group >> dbt_group >> quality_group >> publish_group
+    dbt_group >> validate_analytics_outputs

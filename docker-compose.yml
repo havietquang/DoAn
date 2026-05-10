@@ -28,6 +28,7 @@ services:
         condition: service_healthy
     environment:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__COSMOS__ENABLE_TELEMETRY: "False"
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
