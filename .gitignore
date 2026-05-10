@@ -1,1 +1,9 @@
 target
+
+# Local/internal notes not needed for source push
+/00_START_HERE_SUMMARY.md
+/CHATBOT_PROMPT_DETAILED.md
+/CODE_IMPROVEMENTS.md
+/IMPLEMENTATION_CHECKLIST.md
+/QUICK_START.md
+/REVIEW_AND_IMPROVEMENTS.md

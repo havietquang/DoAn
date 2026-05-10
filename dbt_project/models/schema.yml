@@ -2,63 +2,223 @@ version: 2
 
 sources:
   - name: raw
-    database: "{{ env_var('POSTGRES_DB', 'olist_dw') }}"
+    database: "{{ env_var('POSTGRES_DB') }}"
     schema: raw
+    description: "Raw data from CSV files"
     tables:
-      - name: olist_customers_dataset
       - name: olist_orders_dataset
-      - name: olist_order_items_dataset
+        description: "Raw orders data"
+        columns:
+          - name: order_id
+            description: "Unique order identifier"
+            tests:
+              - unique
+              - not_null
+
+      - name: olist_customers_dataset
+        description: "Raw customers data"
+        columns:
+          - name: customer_id
+            tests:
+              - unique
+              - not_null
+
       - name: olist_products_dataset
+        description: "Raw products data"
+        columns:
+          - name: product_id
+            tests:
+              - unique
+              - not_null
+
       - name: olist_sellers_dataset
+        description: "Raw sellers data"
+        columns:
+          - name: seller_id
+            tests:
+              - unique
+              - not_null
 
 models:
-  - name: stg_customers
+  - name: stg_orders
+    description: "Staging model for orders with type casting"
     columns:
+      - name: order_id
+        description: "Order ID (FK)"
+        tests:
+          - unique
+          - not_null
+
       - name: customer_id
+        description: "Customer ID (FK)"
         tests:
           - not_null
-          - unique
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
 
-  - name: stg_orders
+  - name: stg_customers
+    description: "Staging model for customers"
+    columns:
+      - name: customer_id
+        description: "Customer ID (PK)"
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_order_items
+    description: "Staging model for order items"
     columns:
       - name: order_id
         tests:
           - not_null
-          - unique
 
-  - name: dim_customers
-    columns:
-      - name: customer_id
-        tests:
-          - not_null
-          - unique
-
-  - name: dim_products
-    columns:
       - name: product_id
         tests:
           - not_null
-          - unique
 
-  - name: dim_sellers
-    columns:
       - name: seller_id
         tests:
           - not_null
-          - unique
 
-  - name: dim_date
+  - name: stg_products
+    description: "Staging model for products"
     columns:
-      - name: date_day
+      - name: product_id
         tests:
-          - not_null
           - unique
+          - not_null
+
+  - name: stg_sellers
+    description: "Staging model for sellers"
+    columns:
+      - name: seller_id
+        tests:
+          - unique
+          - not_null
 
   - name: fact_orders
+    description: "Orders fact table for analytics"
     columns:
       - name: order_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+
+      - name: customer_id
+        description: "Foreign key to dim_customers"
         tests:
           - not_null
+          - relationships:
+              to: ref('dim_customers')
+              field: customer_id
+
+      - name: product_id
+        description: "Foreign key to dim_products"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_products')
+              field: product_id
+
+      - name: seller_id
+        description: "Foreign key to dim_sellers"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_sellers')
+              field: seller_id
+
+      - name: order_date
+        description: "Foreign key to dim_date"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_day
+
       - name: total_amount
+        description: "Total order amount in USD"
         tests:
           - not_null
+          - accepted_values:
+              values: [0]
+              config:
+                where: "total_amount > 0"
+
+      - name: price
+        description: "Product price"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0]
+              config:
+                where: "price >= 0"
+
+      - name: freight_value
+        description: "Shipping cost"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0]
+              config:
+                where: "freight_value >= 0"
+
+  - name: dim_customers
+    description: "Customer dimension table"
+    columns:
+      - name: customer_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+
+      - name: customer_unique_id
+        description: "Unique customer identifier"
+        tests:
+          - not_null
+
+  - name: dim_products
+    description: "Product dimension table"
+    columns:
+      - name: product_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+
+      - name: product_category_name
+        description: "Product category"
+        tests:
+          - not_null
+
+  - name: dim_sellers
+    description: "Seller dimension table"
+    columns:
+      - name: seller_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_date
+    description: "Date dimension table"
+    columns:
+      - name: date_day
+        description: "Primary key (DATE)"
+        tests:
+          - unique
+          - not_null
+
+      - name: year
+        description: "Year"
+        tests:
+          - not_null
+
+      - name: month
+        description: "Month (1-12)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
