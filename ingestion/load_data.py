@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    df.columns = [column.strip().lower() for column in df.columns]
+    df.columns = [column.replace("\ufeff", "").strip().lower() for column in df.columns]
     return df
 
 

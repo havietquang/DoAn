@@ -1,3 +1,5 @@
+{{ config(materialized='view', tags=['staging', 'customers'], meta={'layer': 'staging', 'domain': 'customers'}) }}
+
 select
     customer_id,
     customer_unique_id,

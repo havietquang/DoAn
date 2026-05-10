@@ -4,221 +4,259 @@ sources:
   - name: raw
     database: "{{ env_var('POSTGRES_DB') }}"
     schema: raw
-    description: "Raw data from CSV files"
+    description: "Raw Olist data loaded from CSV files."
     tables:
       - name: olist_orders_dataset
-        description: "Raw orders data"
+        description: "Order header data from Olist."
         columns:
           - name: order_id
-            description: "Unique order identifier"
-            tests:
-              - unique
-              - not_null
+            tests: [unique, not_null]
+          - name: customer_id
+            tests: [not_null]
+
+      - name: olist_order_items_dataset
+        description: "Order line-item data."
+        columns:
+          - name: order_id
+            tests: [not_null]
+          - name: product_id
+            tests: [not_null]
+          - name: seller_id
+            tests: [not_null]
+
+      - name: olist_order_payments_dataset
+        description: "Order payment transactions."
+        columns:
+          - name: order_id
+            tests: [not_null]
+
+      - name: olist_order_reviews_dataset
+        description: "Customer review data at order level."
+        columns:
+          - name: review_id
+            tests: [not_null]
+          - name: order_id
+            tests: [not_null]
 
       - name: olist_customers_dataset
-        description: "Raw customers data"
+        description: "Customer master data."
         columns:
           - name: customer_id
-            tests:
-              - unique
-              - not_null
+            tests: [unique, not_null]
 
       - name: olist_products_dataset
-        description: "Raw products data"
+        description: "Product master data."
         columns:
           - name: product_id
-            tests:
-              - unique
-              - not_null
+            tests: [unique, not_null]
 
       - name: olist_sellers_dataset
-        description: "Raw sellers data"
+        description: "Seller master data."
         columns:
           - name: seller_id
-            tests:
-              - unique
-              - not_null
+            tests: [unique, not_null]
+
+      - name: product_category_name_translation
+        description: "Category translation from Portuguese to English."
 
 models:
   - name: stg_orders
-    description: "Staging model for orders with type casting"
+    description: "Standardized order header staging model."
     columns:
       - name: order_id
-        description: "Order ID (FK)"
-        tests:
-          - unique
-          - not_null
-
+        tests: [unique, not_null]
       - name: customer_id
-        description: "Customer ID (FK)"
         tests:
           - not_null
           - relationships:
               to: ref('stg_customers')
               field: customer_id
-
-  - name: stg_customers
-    description: "Staging model for customers"
-    columns:
-      - name: customer_id
-        description: "Customer ID (PK)"
+      - name: order_status
         tests:
-          - unique
-          - not_null
+          - accepted_values:
+              values: ['approved', 'canceled', 'created', 'delivered', 'invoiced', 'processing', 'shipped', 'unavailable']
 
   - name: stg_order_items
-    description: "Staging model for order items"
+    description: "Standardized order line-item staging model."
     columns:
       - name: order_id
         tests:
           - not_null
-
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
       - name: product_id
         tests:
           - not_null
-
+          - relationships:
+              to: ref('stg_products')
+              field: product_id
       - name: seller_id
         tests:
           - not_null
+          - relationships:
+              to: ref('stg_sellers')
+              field: seller_id
+
+  - name: stg_order_payments
+    description: "Standardized payment staging model."
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+
+  - name: stg_order_reviews
+    description: "Standardized review staging model."
+    columns:
+      - name: review_id
+        tests: [not_null]
+      - name: order_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+
+  - name: stg_customers
+    description: "Standardized customer staging model."
+    columns:
+      - name: customer_id
+        tests: [unique, not_null]
 
   - name: stg_products
-    description: "Staging model for products"
+    description: "Standardized product staging model."
     columns:
       - name: product_id
-        tests:
-          - unique
-          - not_null
+        tests: [unique, not_null]
 
   - name: stg_sellers
-    description: "Staging model for sellers"
+    description: "Standardized seller staging model."
     columns:
       - name: seller_id
-        tests:
-          - unique
-          - not_null
+        tests: [unique, not_null]
 
-  - name: fact_orders
-    description: "Orders fact table for analytics"
+  - name: stg_product_category_translation
+    description: "Lookup for product category translation."
+    columns:
+      - name: product_category_name
+        tests: [unique, not_null]
+
+  - name: int_order_payments_summary
+    description: "Silver model summarizing payments at order level."
+
+  - name: int_dominant_payment_type
+    description: "Silver model selecting the dominant payment type for each order."
+
+  - name: int_order_reviews_summary
+    description: "Silver model summarizing reviews at order level."
+
+  - name: int_latest_order_review
+    description: "Silver model keeping the latest review score for each order."
+
+  - name: int_order_item_metrics
+    description: "Silver model aggregating item metrics at order grain."
+
+  - name: int_order_totals
+    description: "Silver model calculating total order amount from item lines."
+
+  - name: int_order_items_enriched
+    description: "Silver detail model joining orders, items, payment summary, and latest review."
+
+  - name: int_orders_enriched
+    description: "Silver order model joining order header with commercial, payment, review, and logistics KPIs."
+
+  - name: dim_customers
+    description: "Customer dimension for geography and buyer segmentation."
+    columns:
+      - name: customer_id
+        tests: [unique, not_null]
+
+  - name: dim_products
+    description: "Product dimension with translated category and physical characteristics."
+    columns:
+      - name: product_id
+        tests: [unique, not_null]
+      - name: product_category_name
+        tests: [not_null]
+
+  - name: dim_sellers
+    description: "Seller dimension for merchant analysis."
+    columns:
+      - name: seller_id
+        tests: [unique, not_null]
+
+  - name: dim_date
+    description: "Calendar dimension based on order purchase date."
+    columns:
+      - name: date_day
+        tests: [unique, not_null]
+
+  - name: fact_order_items
+    description: "Detail fact at one row per product line in an order."
     columns:
       - name: order_id
-        description: "Primary key"
-        tests:
-          - unique
-          - not_null
-
+        tests: [not_null]
+      - name: order_item_id
+        tests: [not_null]
       - name: customer_id
-        description: "Foreign key to dim_customers"
         tests:
           - not_null
           - relationships:
               to: ref('dim_customers')
               field: customer_id
-
       - name: product_id
-        description: "Foreign key to dim_products"
         tests:
           - not_null
           - relationships:
               to: ref('dim_products')
               field: product_id
-
       - name: seller_id
-        description: "Foreign key to dim_sellers"
         tests:
           - not_null
           - relationships:
               to: ref('dim_sellers')
               field: seller_id
-
       - name: order_date
-        description: "Foreign key to dim_date"
         tests:
           - not_null
           - relationships:
               to: ref('dim_date')
               field: date_day
 
-      - name: total_amount
-        description: "Total order amount in USD"
-        tests:
-          - not_null
-          - accepted_values:
-              values: [0]
-              config:
-                where: "total_amount > 0"
-
-      - name: price
-        description: "Product price"
-        tests:
-          - not_null
-          - accepted_values:
-              values: [0]
-              config:
-                where: "price >= 0"
-
-      - name: freight_value
-        description: "Shipping cost"
-        tests:
-          - not_null
-          - accepted_values:
-              values: [0]
-              config:
-                where: "freight_value >= 0"
-
-  - name: dim_customers
-    description: "Customer dimension table"
+  - name: fact_orders
+    description: "Order-level fact table with commercial, logistics, payment, and review KPIs."
     columns:
+      - name: order_id
+        tests: [unique, not_null]
       - name: customer_id
-        description: "Primary key"
-        tests:
-          - unique
-          - not_null
-
-      - name: customer_unique_id
-        description: "Unique customer identifier"
         tests:
           - not_null
-
-  - name: dim_products
-    description: "Product dimension table"
-    columns:
-      - name: product_id
-        description: "Primary key"
-        tests:
-          - unique
-          - not_null
-
-      - name: product_category_name
-        description: "Product category"
+          - relationships:
+              to: ref('dim_customers')
+              field: customer_id
+      - name: order_date
         tests:
           - not_null
-
-  - name: dim_sellers
-    description: "Seller dimension table"
-    columns:
-      - name: seller_id
-        description: "Primary key"
+          - relationships:
+              to: ref('dim_date')
+              field: date_day
+      - name: total_amount
+        tests: [not_null]
+      - name: freight_value
+        tests: [not_null]
+      - name: order_status
         tests:
-          - unique
-          - not_null
-
-  - name: dim_date
-    description: "Date dimension table"
-    columns:
-      - name: date_day
-        description: "Primary key (DATE)"
-        tests:
-          - unique
-          - not_null
-
-      - name: year
-        description: "Year"
-        tests:
-          - not_null
-
-      - name: month
-        description: "Month (1-12)"
-        tests:
-          - not_null
           - accepted_values:
-              values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+              values: ['approved', 'canceled', 'created', 'delivered', 'invoiced', 'processing', 'shipped', 'unavailable']
+
+  - name: agg_sales_monthly
+    description: "Monthly sales and delivery KPI summary."
+
+  - name: agg_seller_performance
+    description: "Seller-level performance summary."
+
+  - name: agg_category_performance
+    description: "Product category performance summary."

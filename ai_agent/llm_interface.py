@@ -22,11 +22,15 @@ WAREHOUSE_CONTEXT = dedent(
     Generate PostgreSQL queries for the analytics schema.
 
     Available tables:
-    - analytics.fact_orders(order_id, customer_id, product_id, seller_id, order_date, order_status, price, freight_value, total_amount)
-    - analytics.dim_customers(customer_id, customer_unique_id, customer_city, customer_state, customer_zip_code_prefix)
-    - analytics.dim_products(product_id, product_category_name, product_weight_g, product_length_cm, product_height_cm, product_width_cm)
-    - analytics.dim_sellers(seller_id, seller_city, seller_state, seller_zip_code_prefix)
-    - analytics.dim_date(date_day, year, month, year_month, day_of_month, day_name)
+    - analytics.fact_orders(order_id, customer_id, order_date, order_status, item_count, distinct_product_count, distinct_seller_count, gross_item_amount, freight_value, total_amount, payment_amount, primary_payment_type, average_review_score, delivery_lead_days, delivery_delay_days, is_delivered_on_time)
+    - analytics.fact_order_items(order_id, order_item_id, customer_id, product_id, seller_id, order_date, order_status, price, freight_value, item_total_amount, order_total_amount, review_score)
+    - analytics.dim_customers(customer_id, customer_unique_id, customer_city, customer_state, customer_zip_code_prefix, customer_city_state)
+    - analytics.dim_products(product_id, product_category_name, product_category_name_english, product_weight_g, product_weight_kg, product_length_cm, product_height_cm, product_width_cm, product_volume_cm3, product_size_tier)
+    - analytics.dim_sellers(seller_id, seller_city, seller_state, seller_zip_code_prefix, seller_city_state)
+    - analytics.dim_date(date_day, year, quarter, month, month_name, week_of_year, year_month, day_of_month, day_of_week, day_name, is_weekend)
+    - analytics.agg_sales_monthly(year, quarter, month, year_month, total_orders, total_items, total_revenue, total_freight, average_order_value, average_review_score, average_delivery_days, on_time_delivery_rate)
+    - analytics.agg_seller_performance(seller_id, seller_state, seller_city, total_orders, total_order_items, total_revenue, total_freight, average_item_value, average_review_score, distinct_products_sold)
+    - analytics.agg_category_performance(product_category_name, product_category_name_english, product_size_tier, total_orders, total_order_items, total_revenue, total_freight, average_item_value, average_review_score, distinct_customers)
 
     Rules:
     - Always qualify tables with the analytics schema
@@ -60,12 +64,10 @@ RULE_BASED_SQL = {
     """,
     "top sellers by revenue": """
         SELECT
-            s.seller_id,
-            s.seller_state,
-            ROUND(SUM(f.total_amount), 2) as total_revenue
-        FROM analytics.fact_orders f
-        JOIN analytics.dim_sellers s ON f.seller_id = s.seller_id
-        GROUP BY s.seller_id, s.seller_state
+            seller_id,
+            seller_state,
+            total_revenue
+        FROM analytics.agg_seller_performance
         ORDER BY total_revenue DESC
         LIMIT 10;
     """,
@@ -77,12 +79,10 @@ RULE_BASED_SQL = {
     """,
     "orders by product category": """
         SELECT
-            p.product_category_name,
-            COUNT(DISTINCT f.order_id) as total_orders,
-            ROUND(SUM(f.total_amount), 2) as total_revenue
-        FROM analytics.fact_orders f
-        JOIN analytics.dim_products p ON f.product_id = p.product_id
-        GROUP BY p.product_category_name
+            product_category_name_english,
+            total_orders,
+            total_revenue
+        FROM analytics.agg_category_performance
         ORDER BY total_revenue DESC;
     """,
 }

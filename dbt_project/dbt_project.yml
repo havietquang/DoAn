@@ -17,9 +17,16 @@ clean-targets:
 
 models:
   olist_dbt:
+    +schema: analytics
+    +persist_docs:
+      relation: true
+      columns: true
     staging:
       +materialized: view
-      +schema: analytics
+      +tags: ["staging"]
+    silver:
+      +materialized: view
+      +tags: ["silver"]
     marts:
       +materialized: table
-      +schema: analytics
+      +tags: ["marts"]

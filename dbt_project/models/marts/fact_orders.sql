@@ -1,18 +1,14 @@
-with order_level as (
-    select
-        oi.order_id,
-        o.customer_id,
-        oi.product_id,
-        oi.seller_id,
-        cast(o.order_purchase_timestamp as date) as order_date,
-        o.order_status,
-        oi.price,
-        oi.freight_value,
-        (oi.price + oi.freight_value) as total_amount
-    from {{ ref('stg_order_items') }} as oi
-    inner join {{ ref('stg_orders') }} as o
-        on oi.order_id = o.order_id
-)
+{{ config(
+    materialized='table',
+    tags=['marts', 'fact', 'orders'],
+    meta={
+        'layer': 'marts',
+        'domain': 'orders',
+        'grain': 'order'
+    }
+) }}
+
+-- Final fact table at order grain for BI and downstream querying.
 
 select
     order_id,
@@ -20,8 +16,30 @@ select
     product_id,
     seller_id,
     order_date,
+    order_purchase_timestamp,
+    order_approved_at,
+    order_delivered_carrier_date,
+    order_delivered_customer_date,
+    order_estimated_delivery_date,
+    order_estimated_delivery_date_day,
     order_status,
-    price,
+    item_count,
+    distinct_product_count,
+    distinct_seller_count,
+    gross_item_amount,
     freight_value,
-    total_amount
-from order_level
+    total_amount,
+    payment_amount,
+    payment_record_count,
+    distinct_payment_type_count,
+    max_payment_installments,
+    primary_payment_type,
+    review_count,
+    average_review_score,
+    max_review_score,
+    min_review_score,
+    approval_lead_hours,
+    delivery_lead_days,
+    delivery_delay_days,
+    is_delivered_on_time
+from {{ ref('int_orders_enriched') }}

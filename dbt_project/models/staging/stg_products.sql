@@ -1,11 +1,13 @@
+{{ config(materialized='view', tags=['staging', 'products'], meta={'layer': 'staging', 'domain': 'products'}) }}
+
 select
     product_id,
     product_category_name,
-    product_name_lenght,
-    product_description_lenght,
-    product_photos_qty,
-    product_weight_g,
-    product_length_cm,
-    product_height_cm,
-    product_width_cm
+    cast(product_name_lenght as integer) as product_name_length,
+    cast(product_description_lenght as integer) as product_description_length,
+    cast(product_photos_qty as integer) as product_photos_qty,
+    cast(product_weight_g as numeric(12, 2)) as product_weight_g,
+    cast(product_length_cm as numeric(12, 2)) as product_length_cm,
+    cast(product_height_cm as numeric(12, 2)) as product_height_cm,
+    cast(product_width_cm as numeric(12, 2)) as product_width_cm
 from {{ source('raw', 'olist_products_dataset') }}
