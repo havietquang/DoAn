@@ -1,7 +1,13 @@
 import os
 import logging
 from typing import Optional
-from pydantic import BaseSettings, validator
+
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:  # pragma: no cover - compatibility with older local envs
+    from pydantic import BaseSettings
+
+from pydantic import validator
 
 
 logger = logging.getLogger(__name__)
@@ -12,8 +18,8 @@ class Settings(BaseSettings):
     postgres_host: str = os.getenv("POSTGRES_HOST", "postgres")
     postgres_port: str = os.getenv("POSTGRES_PORT", "5432")
     postgres_db: str = os.getenv("POSTGRES_DB", "olist_dw")
-    postgres_user: str = os.getenv("POSTGRES_USER", "olist_user")
-    postgres_password: str = os.getenv("POSTGRES_PASSWORD", "olist_pass")
+    postgres_user: str = os.getenv("POSTGRES_USER", "olist")
+    postgres_password: str = os.getenv("POSTGRES_PASSWORD", "olist")
 
     # OpenAI settings
     openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
@@ -22,6 +28,10 @@ class Settings(BaseSettings):
     # API settings
     api_host: str = os.getenv("AI_AGENT_HOST", "0.0.0.0")
     api_port: int = int(os.getenv("AI_AGENT_PORT", "8000"))
+    cors_origins: str = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:8000,http://127.0.0.1:8000",
+    )
 
     # Additional settings
     debug_mode: bool = os.getenv("DEBUG_MODE", "false").lower() == "true"
@@ -50,6 +60,10 @@ class Settings(BaseSettings):
         if v not in valid_models:
             logger.warning(f"Model {v} not in known valid models: {valid_models}")
         return v
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     class Config:
         env_file = ".env"

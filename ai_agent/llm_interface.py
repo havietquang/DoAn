@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import json
+import re
 from textwrap import dedent
-from typing import Optional, Dict, List
+from typing import Any, Dict, List
 from datetime import datetime
 
 from config import settings
@@ -112,12 +114,21 @@ class ConversationMemory:
 conversation_memory = ConversationMemory()
 
 
+def clean_generated_sql(sql: str) -> str:
+    """Normalize common LLM SQL output formats before validation/execution."""
+    cleaned = sql.strip()
+    fenced_match = re.search(r"```(?:sql)?\s*(.*?)```", cleaned, re.IGNORECASE | re.DOTALL)
+    if fenced_match:
+        cleaned = fenced_match.group(1).strip()
+    return cleaned
+
+
 def validate_sql_query(sql: str) -> bool:
     """Basic SQL validation"""
-    sql_lower = sql.lower().strip()
+    sql_lower = clean_generated_sql(sql).lower().strip().rstrip(";").strip()
 
     # Must be SELECT statement
-    if not sql_lower.startswith("select"):
+    if not (sql_lower.startswith("select") or sql_lower.startswith("with")):
         return False
 
     # Must contain FROM
@@ -128,10 +139,25 @@ def validate_sql_query(sql: str) -> bool:
     if "analytics." not in sql_lower:
         return False
 
+    if ";" in sql_lower:
+        return False
+
+    if "--" in sql_lower or "/*" in sql_lower or "*/" in sql_lower:
+        return False
+
     # Check for dangerous operations
-    dangerous_keywords = ["drop", "delete", "update", "insert", "alter", "create"]
+    dangerous_keywords = [
+        "drop", "delete", "update", "insert", "alter", "create",
+        "truncate", "exec", "execute", "merge", "copy", "grant", "revoke",
+        "call", "do", "vacuum", "analyze",
+    ]
     for keyword in dangerous_keywords:
-        if keyword in sql_lower:
+        if re.search(rf"\b{keyword}\b", sql_lower):
+            return False
+
+    dangerous_functions = ["pg_sleep", "pg_read_file", "pg_ls_dir", "dblink"]
+    for function_name in dangerous_functions:
+        if re.search(rf"\b{function_name}\s*\(", sql_lower):
             return False
 
     return True
@@ -179,7 +205,7 @@ def generate_sql(question: str, use_memory: bool = True) -> str:
                 messages=messages,
             )
 
-            sql = response.choices[0].message.content.strip()
+            sql = clean_generated_sql(response.choices[0].message.content)
 
             # Validate generated SQL
             if not validate_sql_query(sql):
@@ -212,3 +238,56 @@ def generate_sql(question: str, use_memory: bool = True) -> str:
 def get_supported_queries() -> List[str]:
     """Return list of supported rule-based queries"""
     return list(RULE_BASED_SQL.keys())
+
+
+def generate_answer(question: str, sql: str, rows: List[Dict[str, Any]]) -> str:
+    """Generate a user-facing analytical answer from SQL result rows."""
+    safe_rows = rows[:50]
+
+    if settings.openai_api_key and OpenAI is not None:
+        client = OpenAI(api_key=settings.openai_api_key)
+        prompt = dedent(
+            f"""
+            You are a Vietnamese data analyst chatbot for the Olist e-commerce warehouse.
+            Answer the user's question using only the SQL result below.
+
+            Requirements:
+            - Reply in Vietnamese.
+            - Be concise but analytical.
+            - Mention important numbers and trends.
+            - If the result is empty, say the data does not contain enough information.
+            - Do not invent facts outside the SQL result.
+
+            Question:
+            {question}
+
+            SQL:
+            {sql}
+
+            Result rows as JSON:
+            {json.dumps(safe_rows, ensure_ascii=False, default=str)}
+            """
+        ).strip()
+
+        response = client.chat.completions.create(
+            model=settings.openai_model,
+            temperature=0.2,
+            max_tokens=700,
+            messages=[
+                {"role": "system", "content": "You explain data analysis results accurately."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        return response.choices[0].message.content.strip()
+
+    if not rows:
+        return "Không tìm thấy dữ liệu phù hợp cho câu hỏi này."
+
+    preview = rows[:3]
+    key_fields = list(preview[0].keys()) if preview else []
+    return (
+        f"Kết quả truy vấn trả về {len(rows)} dòng. "
+        f"Các trường chính gồm: {', '.join(key_fields)}. "
+        f"Một vài dòng đầu: {json.dumps(preview, ensure_ascii=False, default=str)}. "
+        "Để có phần diễn giải tự nhiên hơn, hãy cấu hình OPENAI_API_KEY."
+    )

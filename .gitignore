@@ -1,4 +1,13 @@
 target
+__pycache__/
+*.py[cod]
+*.log
+.env
+
+logs/
+dbt_project/logs/
+dbt_project/target/
+dbt_project/.user.yml
 
 # Local/internal notes not needed for source push
 /00_START_HERE_SUMMARY.md

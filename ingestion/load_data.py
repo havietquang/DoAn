@@ -1,8 +1,6 @@
 from pathlib import Path
 import logging
 from datetime import datetime
-from typing import Optional
-
 import pandas as pd
 from sqlalchemy import text
 
@@ -90,6 +88,15 @@ def ensure_schemas(engine) -> None:
         connection.execute(text("CREATE SCHEMA IF NOT EXISTS analytics;"))
 
 
+def table_exists(connection, schema: str, table_name: str) -> bool:
+    return bool(
+        connection.execute(
+            text("SELECT to_regclass(:qualified_table)"),
+            {"qualified_table": f"{schema}.{table_name}"},
+        ).scalar()
+    )
+
+
 def load_csv_to_postgres(engine, csv_path: Path, truncate: bool = True) -> int:
     """Load CSV with validation and error handling"""
     table_name = csv_path.stem
@@ -110,8 +117,11 @@ def load_csv_to_postgres(engine, csv_path: Path, truncate: bool = True) -> int:
         # Truncate if full refresh
         if truncate:
             with engine.begin() as conn:
-                conn.execute(text(f"TRUNCATE TABLE raw.{table_name} CASCADE;"))
-                logger.info(f"Truncated raw.{table_name}")
+                if table_exists(conn, "raw", table_name):
+                    conn.execute(text(f"TRUNCATE TABLE raw.{table_name} CASCADE;"))
+                    logger.info(f"Truncated raw.{table_name}")
+                else:
+                    logger.info(f"raw.{table_name} does not exist yet; creating it on load")
 
         # Load data
         df.to_sql(

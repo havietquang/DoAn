@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from .constants import ANALYTICS_TABLES, EXPECTED_RAW_FILES, RAW_DATA_DIR, RAW_TABLES
 
 
@@ -7,10 +9,11 @@ def _get_connection():
     import psycopg2
 
     return psycopg2.connect(
-        host="postgres",
-        database="olist_dw",
-        user="olist_user",
-        password="olist_pass",
+        host=os.getenv("POSTGRES_HOST", "postgres"),
+        port=os.getenv("POSTGRES_PORT", "5432"),
+        database=os.getenv("POSTGRES_DB", "olist_dw"),
+        user=os.getenv("POSTGRES_USER", "olist"),
+        password=os.getenv("POSTGRES_PASSWORD", "olist"),
     )
 
 
