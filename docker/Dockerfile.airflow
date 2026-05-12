@@ -9,4 +9,7 @@ RUN pip install --no-cache-dir \
     --constraint "${AIRFLOW_CONSTRAINTS_URL}" \
     -r /tmp/requirements-airflow.txt
 
+COPY docker/airflow_start.sh /airflow_start.sh
+RUN chmod +x /airflow_start.sh
+
 WORKDIR /opt/project

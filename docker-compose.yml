@@ -35,7 +35,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-olist_dw}
       POSTGRES_USER: ${POSTGRES_USER:-olist}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-olist}
-    command: standalone
+      AIRFLOW_ADMIN_USERNAME: ${AIRFLOW_ADMIN_USERNAME:-admin}
+      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
+      AIRFLOW_ADMIN_EMAIL: ${AIRFLOW_ADMIN_EMAIL:-admin@example.com}
+    command: /airflow_start.sh
     ports:
       - "8080:8080"
     volumes:

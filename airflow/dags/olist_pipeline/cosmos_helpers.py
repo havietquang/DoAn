@@ -35,6 +35,7 @@ def build_dbt_task_group(group_id: str, select: list[str]) -> DbtTaskGroup:
         render_config=RenderConfig(
             select=select,
             test_behavior=TestBehavior.AFTER_EACH,
+            emit_datasets=False,
         ),
         operator_args={
             "install_deps": True,
