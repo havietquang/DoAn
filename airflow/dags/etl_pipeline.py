@@ -101,7 +101,13 @@ with DAG(
     ) as publish_group:
         dbt_generate_docs = BashOperator(
             task_id="dbt_generate_docs",
-            bash_command="cd /opt/project/dbt_project && dbt docs generate --profiles-dir .",
+            bash_command=(
+                "rm -rf /tmp/dbt_docs_target && "
+                "cd /opt/project/dbt_project && "
+                "dbt docs generate --profiles-dir . "
+                "--target-path /tmp/dbt_docs_target "
+                "--no-partial-parse"
+            ),
             execution_timeout=timedelta(minutes=10),
         )
 
