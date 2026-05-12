@@ -3,8 +3,9 @@ from __future__ import annotations
 import logging
 import json
 import re
+from decimal import Decimal
 from textwrap import dedent
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 
 from config import settings
@@ -240,6 +241,144 @@ def get_supported_queries() -> List[str]:
     return list(RULE_BASED_SQL.keys())
 
 
+def _as_number(value: Any) -> Optional[float]:
+    """Convert common database numeric values to float for lightweight analysis."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float, Decimal)):
+        return float(value)
+    if isinstance(value, str):
+        normalized = value.replace(",", "").strip()
+        if not normalized:
+            return None
+        try:
+            return float(normalized)
+        except ValueError:
+            return None
+    return None
+
+
+def _format_number(value: Any) -> str:
+    number = _as_number(value)
+    if number is None:
+        return str(value)
+    if abs(number) >= 1000:
+        return f"{number:,.2f}".rstrip("0").rstrip(".")
+    return f"{number:.2f}".rstrip("0").rstrip(".")
+
+
+def _pick_metric_column(rows: List[Dict[str, Any]]) -> Optional[str]:
+    if not rows:
+        return None
+
+    preferred_terms = (
+        "revenue", "amount", "orders", "items", "customers", "sellers",
+        "freight", "value", "rate", "score", "days", "count", "total", "avg",
+    )
+    columns = list(rows[0].keys())
+    numeric_columns = [
+        column for column in columns
+        if any(_as_number(row.get(column)) is not None for row in rows[:20])
+    ]
+    for term in preferred_terms:
+        for column in numeric_columns:
+            if term in column.lower():
+                return column
+    return numeric_columns[0] if numeric_columns else None
+
+
+def _pick_dimension_column(rows: List[Dict[str, Any]], metric_column: Optional[str]) -> Optional[str]:
+    if not rows:
+        return None
+    for column in rows[0].keys():
+        if column == metric_column:
+            continue
+        if any(row.get(column) not in (None, "") for row in rows[:20]):
+            return column
+    return None
+
+
+def _metric_stats(rows: List[Dict[str, Any]], metric_column: str) -> Tuple[float, float, float]:
+    values = [_as_number(row.get(metric_column)) for row in rows]
+    numeric_values = [value for value in values if value is not None]
+    if not numeric_values:
+        return 0.0, 0.0, 0.0
+    return sum(numeric_values), min(numeric_values), max(numeric_values)
+
+
+def _build_rule_based_analysis(question: str, sql: str, rows: List[Dict[str, Any]]) -> str:
+    """Create a detailed Vietnamese analysis without relying on an LLM."""
+    if not rows:
+        return (
+            "Tóm tắt phân tích\n"
+            "- Truy vấn đã chạy thành công nhưng không trả về dòng dữ liệu nào.\n"
+            "- Điều này thường có nghĩa là điều kiện lọc quá hẹp hoặc dữ liệu chưa có bản ghi phù hợp.\n\n"
+            "Gợi ý kiểm tra\n"
+            "- Mở phần SQL để xem bảng và điều kiện lọc đang dùng.\n"
+            "- Thử hỏi lại với khoảng thời gian rộng hơn hoặc bỏ bớt điều kiện lọc."
+        )
+
+    columns = list(rows[0].keys())
+    metric_column = _pick_metric_column(rows)
+    dimension_column = _pick_dimension_column(rows, metric_column)
+
+    lines = [
+        "Tóm tắt phân tích",
+        f"- Câu hỏi: {question}",
+        f"- Truy vấn trả về {len(rows)} dòng với các trường: {', '.join(columns)}.",
+    ]
+
+    if metric_column:
+        total, min_value, max_value = _metric_stats(rows, metric_column)
+        lines.append(f"- Chỉ số chính được phân tích là `{metric_column}`.")
+        lines.append(
+            f"- Tổng `{metric_column}` trong kết quả là {_format_number(total)}; "
+            f"giá trị nhỏ nhất {_format_number(min_value)}, lớn nhất {_format_number(max_value)}."
+        )
+
+    if dimension_column and metric_column:
+        ranked_rows = sorted(
+            rows,
+            key=lambda row: _as_number(row.get(metric_column)) if _as_number(row.get(metric_column)) is not None else float("-inf"),
+            reverse=True,
+        )
+        top_row = ranked_rows[0]
+        bottom_row = ranked_rows[-1]
+        lines.extend([
+            "",
+            "Điểm nổi bật",
+            f"- Cao nhất: {dimension_column} = {top_row.get(dimension_column)} "
+            f"với `{metric_column}` = {_format_number(top_row.get(metric_column))}.",
+            f"- Thấp nhất trong tập kết quả: {dimension_column} = {bottom_row.get(dimension_column)} "
+            f"với `{metric_column}` = {_format_number(bottom_row.get(metric_column))}.",
+        ])
+
+        first_value = _as_number(rows[0].get(metric_column))
+        last_value = _as_number(rows[-1].get(metric_column))
+        if first_value is not None and last_value is not None and len(rows) > 1:
+            change = last_value - first_value
+            pct_change = (change / first_value * 100) if first_value else None
+            direction = "tăng" if change > 0 else "giảm" if change < 0 else "không đổi"
+            change_text = _format_number(abs(change))
+            if pct_change is not None:
+                change_text = f"{change_text} ({abs(pct_change):.2f}%)"
+            lines.append(
+                f"- So sánh dòng đầu và dòng cuối theo thứ tự SQL: `{metric_column}` {direction} {change_text}."
+            )
+
+    lines.extend([
+        "",
+        "Diễn giải nghiệp vụ",
+        "- Kết quả này nên được đọc theo đúng grain của SQL: mỗi dòng là một nhóm dữ liệu sau khi GROUP BY hoặc một bản ghi từ bảng mart.",
+        "- Nếu SQL dùng bảng aggregate như `agg_sales_monthly`, `agg_category_performance` hoặc `agg_seller_performance`, số liệu đã được chuẩn hóa ở lớp marts để phục vụ dashboard và phân tích nhanh.",
+        "",
+        "Gợi ý tiếp theo",
+        "- Có thể drill-down thêm theo thời gian, bang/khu vực, seller hoặc product category để tìm nguyên nhân biến động.",
+        "- Mở phần SQL bên dưới để kiểm tra logic join, group by và order by trước khi đưa số liệu vào báo cáo.",
+    ])
+    return "\n".join(lines)
+
+
 def generate_answer(question: str, sql: str, rows: List[Dict[str, Any]]) -> str:
     """Generate a user-facing analytical answer from SQL result rows."""
     safe_rows = rows[:50]
@@ -253,10 +392,13 @@ def generate_answer(question: str, sql: str, rows: List[Dict[str, Any]]) -> str:
 
             Requirements:
             - Reply in Vietnamese.
-            - Be concise but analytical.
-            - Mention important numbers and trends.
+            - Give a clear, detailed analysis after the SQL has been generated and executed.
+            - Structure the answer with these sections: Tóm tắt phân tích, Điểm nổi bật, Diễn giải nghiệp vụ, Gợi ý tiếp theo.
+            - Mention important numbers, leaders/laggards, trends, and what the metric means.
+            - Explain the result in business language, not only by repeating rows.
             - If the result is empty, say the data does not contain enough information.
             - Do not invent facts outside the SQL result.
+            - Keep the answer practical for an ecommerce analytics report.
 
             Question:
             {question}
@@ -281,13 +423,6 @@ def generate_answer(question: str, sql: str, rows: List[Dict[str, Any]]) -> str:
         return response.choices[0].message.content.strip()
 
     if not rows:
-        return "Không tìm thấy dữ liệu phù hợp cho câu hỏi này."
+        return _build_rule_based_analysis(question, sql, rows)
 
-    preview = rows[:3]
-    key_fields = list(preview[0].keys()) if preview else []
-    return (
-        f"Kết quả truy vấn trả về {len(rows)} dòng. "
-        f"Các trường chính gồm: {', '.join(key_fields)}. "
-        f"Một vài dòng đầu: {json.dumps(preview, ensure_ascii=False, default=str)}. "
-        "Để có phần diễn giải tự nhiên hơn, hãy cấu hình OPENAI_API_KEY."
-    )
+    return _build_rule_based_analysis(question, sql, rows)

@@ -86,139 +86,634 @@ CHATBOT_HTML = """
   <title>Olist AI Data Chatbot</title>
   <style>
     :root {
-      --ink: #17221f;
-      --muted: #60706b;
-      --paper: #f7f1e5;
-      --card: rgba(255,255,255,.78);
-      --accent: #0d6b57;
-      --accent-2: #e07a35;
-      --line: rgba(23,34,31,.14);
+      --bg: #f4f6f5;
+      --surface: #ffffff;
+      --surface-soft: #f8faf9;
+      --ink: #14211d;
+      --muted: #63746f;
+      --line: #d9e1de;
+      --accent: #0f766e;
+      --accent-strong: #115e59;
+      --accent-soft: #dff5f1;
+      --warn: #ea7a2a;
+      --blue-soft: #eef6ff;
+      --shadow: 0 18px 55px rgba(20, 33, 29, .12);
     }
+
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: Georgia, "Times New Roman", serif;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--ink);
-      background:
-        radial-gradient(circle at 12% 18%, rgba(224,122,53,.28), transparent 28rem),
-        radial-gradient(circle at 85% 10%, rgba(13,107,87,.20), transparent 30rem),
-        linear-gradient(135deg, #f7f1e5 0%, #e9dcc6 100%);
+      background: linear-gradient(135deg, #edf2f0 0%, #f8f3eb 100%);
     }
+
     main {
-      width: min(1080px, calc(100% - 32px));
+      width: min(1180px, calc(100% - 32px));
       margin: 0 auto;
-      padding: 40px 0;
+      min-height: 100vh;
+      padding: 28px 0;
       display: grid;
-      grid-template-columns: 360px 1fr;
-      gap: 24px;
+      grid-template-columns: 330px minmax(0, 1fr);
+      gap: 18px;
+      align-items: stretch;
     }
+
     .panel {
-      background: var(--card);
+      background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: 28px;
-      box-shadow: 0 24px 70px rgba(38, 31, 20, .14);
-      backdrop-filter: blur(14px);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
     }
-    .intro { padding: 28px; }
-    h1 { margin: 0 0 14px; font-size: 42px; line-height: .95; letter-spacing: -.04em; }
-    p { color: var(--muted); line-height: 1.55; }
-    .examples { display: grid; gap: 10px; margin-top: 24px; }
+
+    .intro {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: var(--accent);
+      font-weight: 800;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .status {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--surface-soft);
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-row strong { color: var(--ink); }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 7px;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, .14);
+    }
+
+    .section-title {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .examples {
+      display: grid;
+      gap: 9px;
+    }
+
     button.example {
       border: 1px solid var(--line);
-      border-radius: 999px;
-      background: #fff8ed;
-      color: var(--ink);
-      padding: 10px 14px;
-      text-align: left;
-      cursor: pointer;
-    }
-    .chat { min-height: 720px; display: flex; flex-direction: column; overflow: hidden; }
-    .messages { flex: 1; padding: 24px; overflow-y: auto; display: grid; align-content: start; gap: 14px; }
-    .bubble { max-width: 86%; padding: 14px 16px; border-radius: 18px; line-height: 1.5; white-space: pre-wrap; }
-    .user { justify-self: end; background: var(--accent); color: white; border-bottom-right-radius: 6px; }
-    .bot { justify-self: start; background: white; border: 1px solid var(--line); border-bottom-left-radius: 6px; }
-    .sql {
-      margin-top: 10px;
-      padding: 10px;
       border-radius: 12px;
+      background: #fff;
+      color: var(--ink);
+      padding: 12px 13px;
+      text-align: left;
+      font: 700 13px/1.25 inherit;
+      cursor: pointer;
+      transition: border-color .15s ease, transform .15s ease, background .15s ease;
+    }
+
+    button.example:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      transform: translateY(-1px);
+    }
+
+    .tips {
+      margin-top: auto;
+      padding-top: 4px;
+      display: grid;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .chat {
+      height: calc(100vh - 56px);
+      min-height: 640px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      background: var(--surface-soft);
+    }
+
+    .chat-title {
+      display: grid;
+      gap: 3px;
+    }
+
+    .chat-title strong { font-size: 16px; }
+    .chat-title span { color: var(--muted); font-size: 13px; }
+
+    .badge {
+      flex: 0 0 auto;
+      border: 1px solid rgba(15, 118, 110, .22);
+      color: var(--accent-strong);
+      background: var(--accent-soft);
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .messages {
+      flex: 1;
+      padding: 22px;
+      overflow-y: auto;
+      display: grid;
+      align-content: start;
+      gap: 16px;
+      background:
+        linear-gradient(rgba(248, 250, 249, .97), rgba(248, 250, 249, .97)),
+        repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(20, 33, 29, .04) 32px);
+    }
+
+    .bubble {
+      width: fit-content;
+      max-width: min(780px, 88%);
+      padding: 14px 16px;
+      border-radius: 16px;
+      line-height: 1.55;
+      font-size: 14px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .user {
+      justify-self: end;
+      background: var(--accent);
+      color: white;
+      border-bottom-right-radius: 5px;
+      box-shadow: 0 10px 24px rgba(15, 118, 110, .22);
+    }
+
+    .bot {
+      justify-self: start;
+      background: white;
+      border: 1px solid var(--line);
+      border-bottom-left-radius: 5px;
+    }
+
+    .bot.result {
+      width: min(820px, 92%);
+      padding: 0;
+      overflow: hidden;
+      white-space: normal;
+      box-shadow: 0 12px 30px rgba(20, 33, 29, .08);
+    }
+
+    .analysis-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(90deg, var(--blue-soft), #fff);
+    }
+
+    .analysis-head strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .analysis-head span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .analysis-body {
+      padding: 15px 16px 4px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .analysis-body::first-line {
+      font-weight: 800;
+      color: var(--accent-strong);
+    }
+
+    .data-section {
+      padding: 0 16px 16px;
+    }
+
+    .section-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+
+    .loading {
+      color: var(--muted);
+    }
+
+    .result-meta {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    details {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--surface-soft);
+    }
+
+    summary {
+      cursor: pointer;
+      padding: 9px 11px;
+      color: var(--accent-strong);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .sql {
+      margin: 0;
+      padding: 12px;
       background: #10231f;
       color: #dff5ed;
-      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       overflow-x: auto;
+      white-space: pre;
     }
-    form { display: flex; gap: 10px; padding: 18px; border-top: 1px solid var(--line); background: rgba(255,255,255,.55); }
-    input {
-      flex: 1;
+
+    .table-wrap {
+      margin-top: 8px;
+      max-width: 100%;
+      overflow-x: auto;
       border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 14px 16px;
-      font: 16px Georgia, "Times New Roman", serif;
+      border-radius: 12px;
       background: white;
     }
+
+    table {
+      width: 100%;
+      min-width: 420px;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th, td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--muted);
+      background: var(--surface-soft);
+      font-weight: 800;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    form {
+      display: flex;
+      gap: 10px;
+      padding: 16px;
+      border-top: 1px solid var(--line);
+      background: white;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 13px 14px;
+      font: 15px inherit;
+      color: var(--ink);
+      background: var(--surface-soft);
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+      background: white;
+      box-shadow: 0 0 0 4px rgba(15, 118, 110, .12);
+    }
+
     button.send {
       border: none;
-      border-radius: 999px;
-      padding: 0 22px;
-      background: var(--accent-2);
+      border-radius: 12px;
+      min-width: 76px;
+      padding: 0 18px;
+      background: var(--warn);
       color: white;
-      font-weight: 700;
+      font: 800 14px inherit;
       cursor: pointer;
+      transition: transform .15s ease, background .15s ease;
     }
+
+    button.send:hover {
+      background: #d96516;
+      transform: translateY(-1px);
+    }
+
+    button.send:disabled,
+    input:disabled {
+      opacity: .62;
+      cursor: wait;
+    }
+
     @media (max-width: 860px) {
-      main { grid-template-columns: 1fr; padding: 20px 0; }
-      .chat { min-height: 620px; }
-      h1 { font-size: 34px; }
+      main {
+        width: 100%;
+        min-height: 100vh;
+        padding: 0;
+        grid-template-columns: 1fr;
+        gap: 0;
+      }
+
+      .panel {
+        border-radius: 0;
+        box-shadow: none;
+        border-left: none;
+        border-right: none;
+      }
+
+      .intro {
+        padding: 16px;
+        gap: 14px;
+      }
+
+      .brand { align-items: flex-start; }
+      h1 { font-size: 24px; }
+      .status { grid-template-columns: 1fr 1fr; }
+      .tips { display: none; }
+
+      .examples {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      button.example {
+        min-height: 48px;
+        font-size: 12px;
+      }
+
+      .chat {
+        height: calc(100vh - 250px);
+        min-height: 520px;
+      }
+
+      .chat-header {
+        padding: 14px 16px;
+        align-items: flex-start;
+      }
+
+      .messages { padding: 14px; }
+      .bubble { max-width: 94%; font-size: 13px; }
+      .bot.result { width: 100%; }
+      .analysis-head { display: block; }
+      form { padding: 12px; }
+      button.send { min-width: 64px; padding: 0 14px; }
+      table { min-width: 360px; }
     }
   </style>
 </head>
 <body>
   <main>
     <section class="panel intro">
-      <h1>Olist AI Data Chatbot</h1>
-      <p>Chatbot đọc bảng analytics trong PostgreSQL, tự sinh SQL an toàn, chạy truy vấn và trả lời bằng kết quả thật từ data warehouse.</p>
-      <div class="examples">
-        <button class="example">Total revenue by month</button>
-        <button class="example">Top sellers by revenue</button>
-        <button class="example">Orders by product category</button>
-        <button class="example">Total orders by state</button>
+      <div class="brand">
+        <div class="logo">AI</div>
+        <div>
+          <h1>Olist Analytics Chatbot</h1>
+          <p>Hỏi dữ liệu ecommerce bằng ngôn ngữ tự nhiên.</p>
+        </div>
+      </div>
+
+      <div class="status" aria-label="Trạng thái hệ thống">
+        <div class="status-row"><span><span class="dot"></span>API</span><strong>Online</strong></div>
+        <div class="status-row"><span>Schema</span><strong>analytics</strong></div>
+        <div class="status-row"><span>Mode</span><strong>SELECT only</strong></div>
+        <div class="status-row"><span>Tables</span><strong>9 marts</strong></div>
+      </div>
+
+      <div>
+        <p class="section-title">Câu hỏi mẫu</p>
+        <div class="examples">
+          <button class="example">Total revenue by month</button>
+          <button class="example">Top sellers by revenue</button>
+          <button class="example">Orders by product category</button>
+          <button class="example">Total orders by state</button>
+        </div>
+      </div>
+
+      <div class="tips">
+        <span>Gợi ý: hỏi về doanh thu, đơn hàng, seller, khách hàng, category hoặc thời gian.</span>
+        <span>Câu SQL được hiển thị để dễ demo và kiểm tra kết quả.</span>
       </div>
     </section>
+
     <section class="panel chat">
+      <header class="chat-header">
+        <div class="chat-title">
+          <strong>Chat với data warehouse</strong>
+          <span>Trả lời dựa trên PostgreSQL schema analytics</span>
+        </div>
+        <div class="badge">Live data</div>
+      </header>
+
       <div id="messages" class="messages">
-        <div class="bubble bot">Nhập câu hỏi về doanh thu, đơn hàng, seller, khách hàng hoặc danh mục sản phẩm.</div>
+        <div class="bubble bot">
+          Nhập câu hỏi hoặc chọn câu hỏi mẫu bên trái. Kết quả sẽ gồm phần trả lời, bảng dữ liệu xem nhanh và SQL đã chạy.
+        </div>
       </div>
+
       <form id="chat-form">
         <input id="message" placeholder="Ví dụ: top category theo revenue" autocomplete="off" />
         <button class="send" type="submit">Gửi</button>
       </form>
     </section>
   </main>
+
   <script>
     const messages = document.querySelector("#messages");
     const input = document.querySelector("#message");
     const form = document.querySelector("#chat-form");
+    const sendButton = document.querySelector(".send");
 
-    function addBubble(content, cls, sql) {
+    function formatValue(value) {
+      if (value === null || value === undefined) return "";
+      if (typeof value === "number") return Number.isInteger(value) ? value.toLocaleString("en-US") : value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+      return String(value);
+    }
+
+    function renderTable(rows) {
+      if (!rows || rows.length === 0) return null;
+      const columns = Object.keys(rows[0]).slice(0, 6);
+      const tableWrap = document.createElement("div");
+      tableWrap.className = "table-wrap";
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const headRow = document.createElement("tr");
+      columns.forEach((column) => {
+        const th = document.createElement("th");
+        th.textContent = column;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      rows.slice(0, 5).forEach((row) => {
+        const tr = document.createElement("tr");
+        columns.forEach((column) => {
+          const td = document.createElement("td");
+          td.textContent = formatValue(row[column]);
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      tableWrap.appendChild(table);
+      return tableWrap;
+    }
+
+    function addBubble(content, cls, options = {}) {
       const el = document.createElement("div");
       el.className = `bubble ${cls}`;
-      el.textContent = content;
-      if (sql) {
-        const code = document.createElement("div");
-        code.className = "sql";
-        code.textContent = sql;
-        el.appendChild(code);
+
+      if (options.loading) {
+        el.classList.add("loading");
+        el.textContent = content;
       }
+
+      if (options.meta) {
+        el.classList.add("result");
+        const head = document.createElement("div");
+        head.className = "analysis-head";
+        const titleWrap = document.createElement("div");
+        const title = document.createElement("strong");
+        const subtitle = document.createElement("span");
+        title.textContent = "AI phân tích kết quả";
+        subtitle.textContent = "Dựa trên SQL vừa sinh và dữ liệu trả về từ PostgreSQL";
+        titleWrap.appendChild(title);
+        titleWrap.appendChild(subtitle);
+        const meta = document.createElement("div");
+        meta.className = "result-meta";
+        meta.textContent = options.meta;
+        head.appendChild(titleWrap);
+        head.appendChild(meta);
+        el.appendChild(head);
+
+        const body = document.createElement("div");
+        body.className = "analysis-body";
+        body.textContent = content;
+        el.appendChild(body);
+      } else if (!options.loading) {
+        el.textContent = content;
+      }
+
+      const table = renderTable(options.rows);
+      if (table) {
+        const dataSection = document.createElement("div");
+        dataSection.className = "data-section";
+        const label = document.createElement("div");
+        label.className = "section-label";
+        label.textContent = "Bảng dữ liệu xem nhanh";
+        dataSection.appendChild(label);
+        dataSection.appendChild(table);
+        el.appendChild(dataSection);
+      }
+
+      if (options.sql) {
+        const sqlSection = document.createElement("div");
+        sqlSection.className = "data-section";
+        const details = document.createElement("details");
+        const summary = document.createElement("summary");
+        const code = document.createElement("pre");
+        summary.textContent = "Xem SQL";
+        code.className = "sql";
+        code.textContent = options.sql;
+        details.appendChild(summary);
+        details.appendChild(code);
+        sqlSection.appendChild(details);
+        el.appendChild(sqlSection);
+      }
+
       messages.appendChild(el);
       messages.scrollTop = messages.scrollHeight;
+      return el;
     }
 
     async function sendMessage(text) {
       addBubble(text, "user");
       input.value = "";
       input.disabled = true;
-      addBubble("Đang phân tích dữ liệu...", "bot");
-      const pending = messages.lastChild;
+      sendButton.disabled = true;
+      const pending = addBubble("Đang phân tích dữ liệu và chạy SQL...", "bot", { loading: true });
+
       try {
         const res = await fetch("/chat", {
           method: "POST",
@@ -228,11 +723,16 @@ CHATBOT_HTML = """
         const data = await res.json();
         pending.remove();
         if (!res.ok) throw new Error(data.detail || "Request failed");
-        addBubble(`${data.answer}\\n\\nSố dòng: ${data.row_count}`, "bot", data.sql);
+        addBubble(data.answer, "bot", {
+          sql: data.sql,
+          rows: data.result,
+          meta: `${data.row_count} dòng trả về trong ${data.execution_time.toFixed(2)}s`
+        });
       } catch (err) {
         pending.textContent = `Lỗi: ${err.message}`;
       } finally {
         input.disabled = false;
+        sendButton.disabled = false;
         input.focus();
       }
     }
@@ -321,6 +821,8 @@ async def query_data(request: QueryRequest):
 
         execution_time = (datetime.now() - start_time).total_seconds()
 
+        explanation = generate_answer(request.question, sql, rows)
+
         logger.info(f"Query completed successfully. Rows: {len(rows)}, Time: {execution_time:.2f}s")
 
         return QueryResponse(
@@ -329,7 +831,7 @@ async def query_data(request: QueryRequest):
             result=rows,
             row_count=len(rows),
             execution_time=execution_time,
-            explanation="AI agent translated natural language to SQL and executed it on the analytics schema.",
+            explanation=explanation,
             timestamp=datetime.now()
         )
 
