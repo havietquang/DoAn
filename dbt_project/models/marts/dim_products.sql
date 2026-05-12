@@ -9,8 +9,8 @@ with translated_categories as (
 products as (
     select
         p.product_id,
-        p.product_category_name,
-        coalesce(tc.product_category_name_english, p.product_category_name) as product_category_name_english,
+        coalesce(p.product_category_name, 'unknown') as product_category_name,
+        coalesce(tc.product_category_name_english, p.product_category_name, 'unknown') as product_category_name_english,
         p.product_name_length,
         p.product_description_length,
         p.product_photos_qty,
